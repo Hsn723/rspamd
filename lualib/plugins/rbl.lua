@@ -41,6 +41,7 @@ local check_types = {
   selector = {
     require_argument = true,
   },
+  recipients = {},
 }
 
 local default_options = {
@@ -128,6 +129,7 @@ local rule_schema_tbl = {
   received_max_pos = T.number():optional(),
   received_min_pos = T.number():optional(),
   received_nflags = T.array(T.string()):optional(),
+  recipients = T.boolean():optional(),
   replyto = T.boolean():optional(),
   requests_limit = T.one_of({ T.integer(), T.transform(T.string(), tonumber) }):optional(),
   require_symbols = T.one_of({

@@ -39,6 +39,11 @@ RBL FROM HIT WL
   Do Not Expect Symbol  FAKE_RBL_CODE_2
   Expect Symbol With Exact Options  FAKE_WL_RBL_CODE_2  4.3.2.4:from
 
+RBL RECIPIENT HIT
+  Scan File  ${RSPAMD_TESTDIR}/messages/bad_recipient.eml  Rcpt=hello@dirty.sanchez.com
+  ...  Settings={symbols_enabled = [RBL_RECIPIENT]}
+  Expect Symbol With Exact Options  RBL_RECIPIENT_CODE_5  dirty.sanchez.com:recipient
+
 EMAILBL Compose Map 1
   Scan File  ${RSPAMD_TESTDIR}/messages/url14.eml
   ...  Settings={symbols_enabled = [RSPAMD_EMAILBL]}
