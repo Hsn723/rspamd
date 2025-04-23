@@ -850,6 +850,16 @@ local function gen_rbl_callback(rule)
     return true
   end
 
+  local function check_recipients(task, requests_table, whitelist)
+    local recipients = task:get_recipients('smtp')
+    for _, r in ipairs(recipients) do
+      lua_util.debugm(N, task, 'check recipient %s', r)
+      check_email_table(task, r, requests_table, whitelist, 'recipient')
+    end
+
+    return true
+  end
+
   -- Create function pipeline depending on rbl settings
   local pipeline = {
     is_allowed, -- check if rbl is allowed
@@ -912,6 +922,11 @@ local function gen_rbl_callback(rule)
   if rule.selector then
     pipeline[#pipeline + 1] = check_selector
     description[#description + 1] = 'selector'
+  end
+
+  if rule.recipients then
+    pipeline[#pipeline + 1] = check_recipients
+    description[#description + 1] = 'recipients'
   end
 
   if not rule.returncodes_matcher then
@@ -1050,7 +1065,7 @@ local function add_rbl(key, rbl, global_opts)
   end
 
   -- Check if rbl is available for empty tasks
-  if not (rbl.emails or rbl.urls or rbl.dkim or rbl.received or rbl.selector or rbl.replyto) or
+  if not (rbl.emails or rbl.urls or rbl.dkim or rbl.received or rbl.selector or rbl.replyto or rbl.recipients) or
       rbl.is_empty then
     flags_tbl[#flags_tbl + 1] = 'empty'
   end
@@ -1141,7 +1156,7 @@ local function add_rbl(key, rbl, global_opts)
   end
 
   if not rbl.whitelist and not rbl.ignore_url_whitelist and (global_opts.url_whitelist or rbl.url_whitelist) and
-      (rbl.urls or rbl.emails or rbl.dkim or rbl.replyto) and
+      (rbl.urls or rbl.emails or rbl.dkim or rbl.replyto or rbl.recipients) and
       not (rbl.from or rbl.received) then
     local def_type = 'set'
     rbl.whitelist = lua_maps.map_add_from_ucl(rbl.url_whitelist or global_opts.url_whitelist, def_type,
