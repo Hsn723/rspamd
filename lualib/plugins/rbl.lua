@@ -128,6 +128,7 @@ local rule_schema_tbl = {
       end)
   ):is_optional(),
   resolve_ip = ts.boolean:is_optional(),
+  resolve_mx = ts.boolean:is_optional(),
   return_bits = return_bits_schema:is_optional(),
   return_codes = return_codes_schema:is_optional(),
   returnbits = return_bits_schema:is_optional(),
