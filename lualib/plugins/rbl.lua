@@ -139,6 +139,7 @@ local rule_schema_tbl = {
     end)
   }):optional(),
   resolve_ip = T.boolean():optional(),
+  resolve_mx = T.boolean():optional(),
   return_bits = return_bits_schema:optional(),
   return_codes = return_codes_schema:optional(),
   returnbits = return_bits_schema:optional(),
