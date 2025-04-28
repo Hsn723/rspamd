@@ -44,6 +44,11 @@ RBL RECIPIENT HIT
   ...  Settings={symbols_enabled = [RBL_RECIPIENT]}
   Expect Symbol With Exact Options  RBL_RECIPIENT_CODE_5  dirty.sanchez.com:recipient
 
+RBL RECIPIENT IP HIT
+  Scan File  ${RSPAMD_TESTDIR}/messages/bad_recipient.eml  Rcpt=hello@dirty.sanchez.com
+  ...  Settings={symbols_enabled = [RBL_RECIPIENT_IP]}
+  Expect Symbol With Exact Options  RBL_RECIPIENT_IP_CODE_2  1.2.3.4:a.dirty.sanchez.com:recipient
+
 EMAILBL Compose Map 1
   Scan File  ${RSPAMD_TESTDIR}/messages/url14.eml
   ...  Settings={symbols_enabled = [RSPAMD_EMAILBL]}

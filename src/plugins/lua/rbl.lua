@@ -419,6 +419,7 @@ local function gen_rbl_callback(rule)
       local nreq
 
       local resolve_ip = rule.resolve_ip and not is_ip
+      local resolve_mx = rule.resolve_mx and rule.resolve_ip
       if rule.process_script then
         local processed = rule.process_script(req, rule.rbl, task, resolve_ip)
 
@@ -428,6 +429,7 @@ local function gen_rbl_callback(rule)
             n = processed,
             orig = req_str,
             resolve_ip = resolve_ip,
+            resolve_mx = resolve_mx,
             what = { [label] = true },
           }
           requests_table[req] = nreq
@@ -451,6 +453,7 @@ local function gen_rbl_callback(rule)
           n = to_resolve,
           orig = req_str,
           resolve_ip = resolve_ip,
+          resolve_mx = resolve_mx,
           what = { [label] = true },
         }
         requests_table[req] = nreq
@@ -960,6 +963,9 @@ local function gen_rbl_callback(rule)
     -- Used for 2 passes ip resolution
     local resolved_req = {}
     local nresolved = 0
+    -- Used for MX resolution
+    local resolved_mx_req = {}
+    local nmxresolved = 0
 
     -- This is called when doing resolve_ip phase...
     local function gen_rbl_ip_dns_callback(orig_resolve_table_elt)
@@ -1004,38 +1010,104 @@ local function gen_rbl_callback(rule)
       end
     end
 
+
+    -- This is called when doing the resolve_mx phase...
+    local function gen_rbl_mx_dns_callback(orig_resolve_table_elt)
+      return function(_, _, results, err)
+        if not err then
+          for _, dns_res in ipairs(results) do
+            if type(dns_res) == 'table' then
+              -- Add result as an actual RBL request
+              local label = next(orig_resolve_table_elt.what)
+              local dup, nreq = add_dns_request(task, dns_res.name, false, false, resolved_mx_req, label)
+              if not dup then
+                nreq.orig = nreq.orig .. ':' .. orig_resolve_table_elt.n
+              end
+            end
+          end
+        end
+
+        nmxresolved = nmxresolved - 1
+
+        if nmxresolved == 0 then
+          -- Emit IP resolution request
+          for name, req in pairs(resolved_mx_req) do
+            local val_res, val_error = validate_dns(req.n)
+            if val_res then
+              lua_util.debugm(N, task, "rbl %s; resolve %s -> %s",
+                  rule.symbol, name, req.n)
+              -- hack
+              req.resolve_mx = false
+              if (rule.ipv4 == nil or rule.ipv4) and r:resolve_a({
+                task = task,
+                name = req.n,
+                callback = gen_rbl_ip_dns_callback(req),
+                forced = req.forced
+              }) then
+                nresolved = nresolved + 1
+              end
+              if (rule.ipv6 == nil or rule.ipv6) and r:resolve('aaaa', {
+                task = task,
+                name = req.n,
+                callback = gen_rbl_ip_dns_callback(req),
+                forced = req.forced
+              }) then
+                nresolved = nresolved + 1
+              end
+            else
+              rspamd_logger.warnx(task, 'cannot send invalid DNS request %s for %s: %s',
+                  req.n, rule.symbol, val_error)
+            end
+          end
+        end
+      end
+    end
+
     for name, req in pairs(dns_req) do
       local val_res, val_error = validate_dns(req.n)
       if val_res then
         lua_util.debugm(N, task, "rbl %s; resolve %s -> %s",
             rule.symbol, name, req.n)
 
-        if req.resolve_ip then
-          -- Deal with both ipv4 and ipv6
-          -- Resolve names first
-          if (rule.ipv4 == nil or rule.ipv4) and r:resolve_a({
+        if req.resolve_mx then
+          if r:resolve_mx({
             task = task,
             name = req.n,
-            callback = gen_rbl_ip_dns_callback(req),
+            callback = gen_rbl_mx_dns_callback(req),
             forced = req.forced
           }) then
-            nresolved = nresolved + 1
-          end
-          if (rule.ipv6 == nil or rule.ipv6) and r:resolve('aaaa', {
-            task = task,
-            name = req.n,
-            callback = gen_rbl_ip_dns_callback(req),
-            forced = req.forced
-          }) then
-            nresolved = nresolved + 1
+            nmxresolved = nmxresolved + 1
           end
         else
-          r:resolve_a({
-            task = task,
-            name = req.n,
-            callback = gen_rbl_dns_callback(req),
-            forced = req.forced
-          })
+
+          if req.resolve_ip then
+            -- Deal with both ipv4 and ipv6
+            -- Resolve names first
+            if (rule.ipv4 == nil or rule.ipv4) and r:resolve_a({
+              task = task,
+              name = req.n,
+              callback = gen_rbl_ip_dns_callback(req),
+              forced = req.forced
+            }) then
+              nresolved = nresolved + 1
+            end
+            if (rule.ipv6 == nil or rule.ipv6) and r:resolve('aaaa', {
+              task = task,
+              name = req.n,
+              callback = gen_rbl_ip_dns_callback(req),
+              forced = req.forced
+            }) then
+              nresolved = nresolved + 1
+            end
+          else
+            r:resolve_a({
+              task = task,
+              name = req.n,
+              callback = gen_rbl_dns_callback(req),
+              forced = req.forced
+            })
+          end
+
         end
 
       else
